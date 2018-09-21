@@ -1,0 +1,110 @@
+Pipelines in Go
+A pattern for processing streams of data
+19 Sep 2018
+
+Jonathan Cantrell
+@jthn
+
+* Introduction
+
+The pipeline pattern affords us a straightforward and consistent means to work with channels
+
+By adopting some conventions, we can construct our applications in a manner which allows the runtime to optimize our applications for us 
+
+* Pipelines
+
+A pipeline is a type of concurrent program
+
+Pipelines connect stages
+
+Stages execute goroutines
+
+Data travels through pipeline stages via channels
+
+* Concurrency
+
+Concurrency, in terms of the Go language, is a composition of independently executing processes (things)
+
+It does not necessarily mean that things operate simultaneously (i.e. not parallel)
+
+It is structural
+
+It enabled parallelism
+
+.link https://vimeo.com/49718712 Gophers Burning Books
+a.k.a. Rob Pike - ‘Concurrency Is Not Parallelism’
+
+* Stages
+
+Each stage:
+
+- receive values from upstream via inbound channels
+- perform some function on that data, usually producing new values
+- send values downstream via outbound channels
+
+Outbound channel lifecycle is managed in the goroutine that produces it
+
+Input stage does not receive input channels - a.k.a. _source_ or _producer_
+
+Final stage does not produce output channels - a.k.a. _sink_ or _consumer_
+
+* Querier
+
+.code pipelines/querier.go /START/,/STOP/
+
+: Presenter notes(contrived example, processor does not need to be in a goroutine)
+: Presenter notes(however, writing in a separate goroutine will allow the runtime to flex)
+
+* Querier with errors
+
+.code pipelines/querier_with_errors.go /START/,/STOP/
+
+* Processor
+
+: Presenter notes(writes block until reads have been satisfied by one or more reads i.e. write is consumed)
+
+.code pipelines/processor.go /START/,/STOP/
+
+* Runner
+
+.code pipelines/runner.go /START/,/STOP/
+
+: Presenter notes(what do we do with the two error channels?)
+
+* Error Handling
+
+.code pipelines/runner_with_errors.go /START/,/STOP/
+
+: Presenter notes(this _should_ work but it might be getting a little messy)
+
+* Processor returning done
+
+.code pipelines/processor_done.go /START/,/STOP/
+
+* Context
+
+Note that our usage of `<-done` is very similar to how `<-ctx.Done()` can be used
+
+We can use these primitives to construct cancellation chains with context
+
+We can even use context to pass our errors around!
+
+* Hot Take
+
+.link https://dave.cheney.net/2017/08/20/context-isnt-for-cancellation Context is not for cancellation
+
+Context should not modify the nature of the response, if we use context for lifecycle management, we break that rule
+
+* Fan In Error Channels
+
+We can set up multiple goroutines to merge our error channels in
+
+.link https://github.com/GetTerminus/ads-linkedin/blob/master/pkg/report/queries.go#L149 Fan in error handler
+
+.link https://github.com/GetTerminus/ads-linkedin/blob/master/pkg/report/generator.go#L65 Usage
+
+We can also simply pass the same error channel through
+
+This achieves the same result with marginally more setup
+
+* Discuss
